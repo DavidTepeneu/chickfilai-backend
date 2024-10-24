@@ -5,7 +5,7 @@ import response_generator
 
 app = Flask(__name__)
 app.config["CORS_HEADERS"] = "Content-Type"
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/*": {"origins": "https://chickfilai-frontend.onrender.com"}})
 
 
 @app.route("/chat", methods=["POST"])
