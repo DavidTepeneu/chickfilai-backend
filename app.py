@@ -8,7 +8,7 @@ app.config["CORS_HEADERS"] = "Content-Type"
 CORS(app, resources={r"/*": {"origins": "https://chickfilai-frontend.onrender.com"}})
 
 
-@app.route("/chat", methods=["POST"])
+@app.route("/", methods=["POST"])
 def get_bot_response():
     customer_message = request.json.get("customer_message")
     if customer_message:
