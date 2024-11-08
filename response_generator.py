@@ -2,7 +2,6 @@ import boto3
 import os
 import re
 from order import Order
-import re
 
 dynamodb = boto3.resource(
     "dynamodb",
@@ -13,72 +12,45 @@ dynamodb = boto3.resource(
 menu = dynamodb.Table("CFA-Data")
 order = Order()
 
-
 def modify_order(entities):
     food_items = entities["food_items"]
-    quantities = entities["quantities"]
+    discriminators = entities["discriminator"]
+    quantities = entities["quantities"] if "quantities" in entities else []
+    modifiers = entities["modifiers"] if "modifiers" in entities else []
 
-    if not food_items:
-        return "No food items were found to modify in your order."
+    if not food_items or not discriminators:
+        return "No food items or actions were found to modify in your order."
 
-    modified_items = []
+    for i in range(len(food_items)):
+        food_item = food_items[i]
+        discriminator = discriminators[i]
+        quantity = quantities[i] if i < len(quantities) else 1
+        modifier = modifiers[i] if i < len(modifiers) else None
 
-    # If there are two food items: remove the first and add the second
-    if len(food_items) == 2:
-        food_item_to_remove = food_items[0]
-        food_item_to_add = food_items[1]
-        quantity_to_add = quantities[1] if len(quantities) > 1 else 1
-
-        # Remove the first item
-        response_remove = menu.get_item(Key={"Item": food_item_to_remove})
-        if "Item" in response_remove:
-            matched_item_remove = response_remove["Item"]
-            price_remove = float(matched_item_remove["Price"])
-            order.remove_item(food_item_to_remove, price_remove)
-            modified_items.append(f"Removed {food_item_to_remove} from your order.")
-        else:
-            modified_items.append(
-                f"Sorry, we couldn't find '{food_item_to_remove}' on the menu to remove."
-            )
-
-        # Add the second item
-        response_add = menu.get_item(Key={"Item": food_item_to_add})
-        if "Item" in response_add:
-            matched_item_add = response_add["Item"]
-            price_add = float(matched_item_add["Price"])
-            order.add_item(food_item_to_add, price_add, quantity_to_add)
-            modified_items.append(
-                f"Added {food_item_to_add} to your order with quantity {quantity_to_add}."
-            )
-        else:
-            modified_items.append(
-                f"Sorry, we couldn't find '{food_item_to_add}' on the menu to add."
-            )
-
-    # If only one item: remove it from the order
-    elif len(food_items) == 1:
-        food_item_to_remove = food_items[0]
-        response = menu.get_item(Key={"Item": food_item_to_remove})
-
+        response = menu.get_item(Key={"Item": food_item})
         if "Item" in response:
-            matched_item_remove = response["Item"]
-            price_remove = float(matched_item_remove["Price"])
-            order.remove_item(food_item_to_remove, price_remove)
-            modified_items.append(f"Removed {food_item_to_remove} from your order.")
-        else:
-            modified_items.append(
-                f"Sorry, we couldn't find '{food_item_to_remove}' on the menu to remove."
-            )
+            matched_item = response["Item"]
+            price = float(matched_item["Price"])
 
-    if modified_items:
-        modified_string = (
-            ", ".join(modified_items[:-1]) + f", and {modified_items[-1]}"
-            if len(modified_items) > 1
-            else modified_items[0]
-        )
-        return f"{modified_string} Your order has been updated."
-    else:
-        return "No changes were made to your order."
+            if modifier:
+                if discriminator == "Add":
+                    order.add_modifier(food_item, f"add {modifier}")
+                else:
+                    order.add_modifier(food_item, f"no {modifier}")
+            elif discriminator == "Add":
+                order.add_item(food_item, price, quantity)
+            elif discriminator == "Remove":
+                order.remove_item(food_item, price, quantity)
+
+    # save_user_order(order)
+
+    order_items = order.get_total_items()
+    order_details = []
+
+    for item, quantity in order_items.items():
+        order_details.append(f"{quantity} x {item}" + (order.modifiers[item] if item in order.modifiers else ""))
+
+    return f"Your order has been updated. Here is your order: {', '.join(order_details)}"
 
 
 def get_order_nutrition(entities):
@@ -170,10 +142,44 @@ def get_order_status():
 
     order_summary = ", ".join(order_details)
 
-    return f"Your current order is {order_summary}."
-
+    return f"Your current order is {order_summary} for a total of ${order.get_total_price()}."
 
 def place_order(entities):
+    added_items = []
+
+    for item in entities['item_detail']:
+        food_item = item.get("food_items")
+        quantity = int(item.get("quantities", 1))
+        discriminator = item.get("discriminator")
+        modifier = item.get("modifiers")
+
+        response = menu.get_item(Key={"Item": food_item})
+        
+        if "Item" in response:
+            matched_item = response["Item"]
+            price = float(matched_item["Price"])
+
+            order.add_item(food_item, price, quantity)
+            added_item_str = f"Added {quantity}x {food_item} to your order at ${price:.2f} each."
+
+            if modifier and discriminator:
+                order.add_modifier(food_item, discriminator, modifier)
+                added_item_str += f" {discriminator.capitalize()} {modifier}."
+
+            added_items.append(added_item_str)
+
+    if added_items:
+        added_string = (
+            ", ".join(added_items[:-1]) + f", and {added_items[-1]}"
+            if len(added_items) > 1
+            else added_items[0]
+        )
+        return f"{added_string} Your order has been updated."
+    else:
+        return "No items were added to your order."
+
+
+def order_place(entities):
     food_items = entities["food_items"]
     quantities = entities["quantities"]
 
@@ -200,7 +206,7 @@ def place_order(entities):
         else:
             # Handle case when item is not found in the menu
             added_items.append(f"Sorry, we couldn't find '{food_item}' on the menu.")
-
+    #save_user_order(order)
     if added_items:
         added_string = (
             ", ".join(added_items[:-1]) + f", and {added_items[-1]}"
@@ -214,14 +220,9 @@ def place_order(entities):
 
 def cancel_order():
     order.clear_order()
-
     return "Okay, I have canceled your order."
 
 
-# for entire menu: list out every menu item (not nutrition or calorie or ingredients etc)
-# for dietary restrictions: query against a "vegan" or "vegetarian" tag (need to define intent scope for both of these (any other dietary restriction doesnt matter, dont worry about it for now)), and return all items that correspond to this tag
-# for ingredients of an item, return every single ingredient
-# for nutritional information of an item, return every single nutritional fact (calorie, saturated fat, trans fat, etc etc)
 def list_entire_menu():
     try:
         response = menu.scan()
@@ -232,7 +233,6 @@ def list_entire_menu():
         return f"Exception {e}"
 
 
-# Helper for dietary restrictions
 def is_vegetarian(ingredients):
     non_vegetarian_items = [
         "chicken",
@@ -257,7 +257,6 @@ def is_vegetarian(ingredients):
     return True
 
 
-# Helper for dietary restrictions
 def is_vegan(ingredients):
     if not is_vegetarian(ingredients):
         return False
@@ -281,31 +280,76 @@ def is_vegan(ingredients):
 
 
 def get_items_by_dietary_restriction(entities):
-    if entities and "modifiers" in entities:
-        restriction = entities["modifiers"].lower()
+    if entities and "dietary" in entities:
+        restriction = entities["dietary"].lower()
     else:
-        return "Please specify a dietary restriction (e.g., vegetarian, vegan)."
+        return "Please specify a dietary restriction (e.g., vegetarian, vegan, dairy-free, soy-free, etc.)."
 
     try:
         response = menu.scan()
         items = response.get("Items", [])
-
-        matching_items = []
+        
+        # If specific food items are provided, filter the items list
+        if entities and "food_items" in entities and entities["food_items"]:
+            food_items = [item.lower() for item in entities["food_items"]]
+            items = [item for item in items if item.get("Item", "").lower() in food_items]
+        
+        matching_items = set()
 
         for item in items:
             ingredients = item.get("Ingredients", "").lower()
+            
+            # Vegan restriction check
             if restriction == "vegan":
                 if is_vegan(ingredients):
-                    matching_items.append(item["Item"])
+                    matching_items.add(item["Item"])
+                    
+            # Vegetarian restriction check
             elif restriction == "vegetarian":
                 if is_vegetarian(ingredients):
-                    matching_items.append(item["Item"])
+                    matching_items.add(item["Item"])
+            
+            # Checking for allergen-related restrictions
+            elif restriction == "dairy":
+                if item.get("Dairy") == 0:
+                    matching_items.add(item["Item"])
+            elif restriction == "soy":
+                if item.get("Soy") == 0:
+                    matching_items.add(item["Item"])
+            elif restriction == "wheat":
+                if item.get("Wheat") == 0:
+                    matching_items.add(item["Item"])
+            elif restriction == "tree_nuts":
+                if item.get("Tree_Nuts") == 0:
+                    matching_items.add(item["Item"])
+            elif restriction == "fish":
+                if item.get("Fish") == 0:
+                    matching_items.add(item["Item"])
+            elif restriction == "egg":
+                if item.get("Egg") == 0:
+                    matching_items.add(item["Item"])
             else:
-                return "Currently, we only support 'vegan' and 'vegetarian' dietary restrictions."
-
-        if not matching_items:
-            return f"No items found for dietary restriction: {restriction}."
-        return f"Here are some of our {restriction} items: {', '.join(matching_items)}"
+                return "Currently, we only support 'vegan', 'vegetarian', and allergen-related dietary restrictions like 'dairy-free', 'soy-free', etc."
+        
+        # Handling specific food items and results formatting
+        if entities and "food_items" in entities and entities["food_items"]:
+            res = []
+            for item in entities["food_items"]:
+                if not matching_items or item not in matching_items:
+                    if restriction == 'vegan' or restriction == 'vegetarian':
+                        res.append(f"{item} is not {restriction}")
+                    else:
+                        res.append(f"{item} is not {restriction}-free")
+                else:
+                    if restriction == 'vegan' or restriction == 'vegetarian':
+                        res.append(f"{item} is {restriction}")
+                    else:
+                        res.append(f"{item} is {restriction}-free")
+            return '. '.join(res)
+        else:
+            if not matching_items:
+                return f"No items found for dietary restriction: {restriction}."
+            return f"Here are some of our {restriction}-free items: {', '.join(matching_items)}"
     except Exception as e:
         return f"Error retrieving for items with restriction {restriction}: {str(e)}"
 
@@ -399,6 +443,18 @@ def get_nutritional_info(entities):
 
     except Exception as e:
         return f"Error retrieving nutritional information for '{food_item}': {str(e)}"
+    
+
+def get_item_description(entities):
+    food_item = entities["food_items"]
+    try:
+        response = menu.get_item(Key={"Item": food_item})
+        if 'Item' in response:
+            description = response['Item'].get('Description')
+            return description if description else "Description not available."
+    except Exception as e:
+        return f"Error retrieving description for {food_item}"
+    pass
 
 
 def out_of_scope():

@@ -32,42 +32,48 @@ def get_intent_and_entities(customer_message):
 
 
 def menu_dietary(entities):
-    original_intent = "menu dietary information"
+    original_intent = "asking for specific menu dietary information, including vegan or vegetarian restrictions"
     database_information = response_generator.get_items_by_dietary_restriction(entities)
 
     return construct_output_response(original_intent, entities, database_information)
 
 
 def menu_entire():
-    original_intent = "entire menu information"
+    original_intent = "asking for the entire menu. this should be listed by groups. all menu items must be listed"
     database_information = response_generator.list_entire_menu()
 
     return construct_output_response(original_intent, "", database_information)
 
 
 def menu_ingredients(entities):
-    original_intent = "ingredients of a menu item"
+    original_intent = "getting the ingredients of a menu item"
     database_information = response_generator.get_ingredients(entities)
 
     return construct_output_response(original_intent, entities, database_information)
 
 
 def menu_nutrition(entities):
-    original_intent = "nutritional information of a menu item"
+    original_intent = "getting the nutritional information of a menu item"
     database_information = response_generator.get_nutritional_info(entities)
+
+    return construct_output_response(original_intent, entities, database_information)
+
+def item_description(entities):
+    original_intent = "getting the description of a certain item"
+    database_information = response_generator.get_item_description(entities)
 
     return construct_output_response(original_intent, entities, database_information)
 
 
 def order_cancel(entities):
-    original_intent = "cancelling an order"
+    original_intent = "cancelling an order in its entirety"
     database_information = response_generator.cancel_order()
 
     return construct_output_response(original_intent, entities, database_information)
 
 
 def order_modify(entities):
-    original_intent = "modifying or changing an order"
+    original_intent = "modifying or changing an order, including removing items."
     database_information = response_generator.modify_order(entities)
 
     return construct_output_response(original_intent, entities, database_information)
@@ -81,7 +87,13 @@ def order_nutrition(entities):
 
 
 def order_place(entities):
-    original_intent = "placing an order"
+    original_intent = "placing an order or adding items to a current order"
+    database_information = response_generator.order_place(entities)
+
+    return construct_output_response(original_intent, entities, database_information)
+
+def place_order(entities):
+    original_intent = "placing an order or adding items to a current order"
     database_information = response_generator.place_order(entities)
 
     return construct_output_response(original_intent, entities, database_information)
@@ -94,10 +106,8 @@ def order_status():
     return construct_output_response(original_intent, "", database_information)
 
 
-def construct_output_response(
-    original_intent, extracted_entities, database_information
-):
-    return database_information
+def construct_output_response(original_intent, extracted_entities, database_information):
+   return database_information
 
 
 '''
