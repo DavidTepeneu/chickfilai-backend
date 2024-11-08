@@ -7,12 +7,6 @@ app = Flask(__name__)
 app.config["CORS_HEADERS"] = "Content-Type"
 CORS(app, resources={r"/*": {"origins": "https://chickfilai-frontend.onrender.com"}})
 
-@app.before_request
-def before_request():
-    if "user_id" not in session:
-        session["user_id"] = str(uuid.uuid4())
-        session["order"] = Order().__dict__
-
 @app.route("/", methods=["POST"])
 def get_bot_response():
     customer_message = request.json.get("customer_message")
