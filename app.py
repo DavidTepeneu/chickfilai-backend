@@ -13,7 +13,7 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
 )  # The browser cookies are valid for 30 minutes
 CORS(app, resources={r"/*": {"origins": "https://chickfilai-frontend.onrender.com"}})
 
-@app.route("/chat", methods=["POST"])
+@app.route("/", methods=["POST"])
 def get_bot_response():
     customer_message = request.json.get("customer_message")
     if customer_message:
