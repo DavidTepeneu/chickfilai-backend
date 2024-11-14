@@ -12,6 +12,19 @@ menu = db["Menu-Info"]
 order = Order()
 
 
+units = {
+            "Calories": "",
+            "Fat": "G",
+            "Sat. Fat": "G",
+            "Trans Fat": "G",
+            "Cholesterol": "MG",
+            "Sodium": "MG",
+            "Carbohydrates": "G",
+            "Fiber": "G",
+            "Sugar": "G",
+            "Protein": "G"
+        }
+
 def modify_order(entities):
     item_details = entities["item_detail"]
     discriminators = entities["discriminator"]
@@ -50,15 +63,15 @@ def get_order_nutrition(entities):
     if properties and properties[0] == "nutrition":
         requested_nutrients = [
             "Calories",
-            "Fat (G)",
-            "Sat. Fat (G)",
-            "Trans Fat (G)",
-            "Cholesterol (MG)",
-            "Sodium (MG)",
-            "Carbohydrates (G)",
-            "Fiber (G)",
-            "Sugar (G)",
-            "Protein (G)"
+            "Fat",
+            "Sat. Fat",
+            "Trans Fat",
+            "Cholesterol",
+            "Sodium",
+            "Carbohydrates",
+            "Fiber",
+            "Sugar",
+            "Protein"
         ]
     elif properties:
         requested_nutrients = properties
@@ -79,7 +92,7 @@ def get_order_nutrition(entities):
                 total_nutrition[nutrient] += float(nutrient_value) * quantity
 
             nutrient_details = ", ".join(
-                [f"{nutritional_info[n]} {n}" for n in requested_nutrients]
+                [f"{nutritional_info[n]}{units[n]} {n}" for n in requested_nutrients]
             )
             nutritional_info_list.append(f"{quantity}x {food_item}: {nutrient_details}")
 
@@ -292,15 +305,15 @@ def get_nutritional_info(entities):
             # List of all possible nutritional values
             requested_nutrients = [
                 "Calories",
-                "Fat (G)",
-                "Sat. Fat (G)",
-                "Trans Fat (G)",
-                "Cholesterol (MG)",
-                "Sodium (MG)",
-                "Carbohydrates (G)",
-                "Fiber (G)",
-                "Sugar (G)",
-                "Protein (G)"
+                "Fat",
+                "Sat. Fat",
+                "Trans Fat",
+                "Cholesterol",
+                "Sodium",
+                "Carbohydrates",
+                "Fiber",
+                "Sugar",
+                "Protein"
             ]
         else:
             # Gather only the specific properties requested
@@ -322,7 +335,7 @@ def get_nutritional_info(entities):
         nutrient_details = "\n".join(
             [
                 (
-                    f"{nutrient}: {nutritional_info[nutrient]:.2f}"
+                    f"{nutrient}: {nutritional_info[nutrient]:.2f}{units[nutrient]}"
                     if isinstance(nutritional_info[nutrient], (int, float))
                     else f"{nutrient}: {nutritional_info[nutrient]}"
                 )
